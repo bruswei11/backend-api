@@ -38,8 +38,11 @@ computadora, sin depender de la PC del Departamento. Todo gratis.
    - **DB_USUARIO:** lo que va después de `user=` → `postgres.abcdefghij`
    - **DB_PASSWORD:** la contraseña del punto 2.
 
-No hace falta crear tablas: el sistema las crea solo la primera vez (y les activa la protección
-RLS para que la API pública de Supabase no pueda leerlas).
+5. **Cargar la base inicial (cuentas reales):** en Supabase → **SQL Editor** → *New query* →
+   abrí con el Bloc de notas el archivo **`supabase-inicial.sql` del Escritorio**, copiá TODO,
+   pegalo y tocá **Run**. Al final tiene que mostrar `admin` y `josechavez`. Crea todas las tablas
+   (con la protección RLS activada) y las dos cuentas, con **las mismas contraseñas que en la PC**.
+   Después **borrá ese archivo** del Escritorio: tiene datos de las cuentas.
 
 ## Paso 2 — GitHub (el código)
 
@@ -68,8 +71,7 @@ RLS para que la API pública de Supabase no pueda leerlas).
    | `DB_PASSWORD` | la del paso 1 |
    | `JWT_SECRET` | 64 caracteres al azar (ver abajo) |
    | `APP_CREAR_TABLAS` | `true` |
-   | `APP_DATOS_DEMO` | `true` (datos inventados para probar) |
-   | `APP_DEMO_PASSWORD` | una contraseña para los usuarios de prueba |
+   | `APP_DATOS_DEMO` | `false` (ya cargaste las cuentas reales en el paso 1) |
    | `ADJUNTOS_EN_BASE` | `true` (Render gratis no guarda archivos: van a la base) |
    | `DB_MAX_CONEXIONES` | `3` |
 
@@ -79,9 +81,7 @@ RLS para que la API pública de Supabase no pueda leerlas).
    ```
 5. En *Advanced* → **Health Check Path:** `/api/health`.
 6. *Create Web Service*. La primera vez tarda 5–10 minutos (compila todo). Cuando diga **Live**,
-   abrí el link: aparece el login.
-   Usuarios de prueba: `demo_admin`, `demo_psicologa`, `demo_psicologo2`, `demo_secretaria`
-   (contraseña: la de `APP_DEMO_PASSWORD`).
+   abrí el link: aparece el login. Entrá con **josechavez** o **admin** y su contraseña de siempre.
 
 ## Paso 4 — UptimeRobot (que no se duerma)
 
