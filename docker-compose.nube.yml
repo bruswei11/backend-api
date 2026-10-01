@@ -1,0 +1,41 @@
+# Base de datos + servidor juntos, para una máquina virtual en la nube (o cualquier PC con Docker).
+# Uso:  1) copiar .env.ejemplo como .env y completar las claves
+#       2) docker compose -f docker-compose.nube.yml up -d --build
+services:
+  base:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
+      MYSQL_DATABASE: psicologia
+      TZ: America/Asuncion
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - datos_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      retries: 30
+
+  servidor:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      base:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://base:3306/psicologia?useSSL=false&allowPublicKeyRetrieval=true
+      DB_USUARIO: root
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      APP_CREAR_TABLAS: "true"
+      APP_DATOS_DEMO: ${APP_DATOS_DEMO:-false}
+      APP_DEMO_PASSWORD: ${APP_DEMO_PASSWORD:-Demo2026!}
+    ports:
+      - "${PUERTO:-8080}:8080"
+    volumes:
+      - adjuntos:/datos/adjuntos
+
+volumes:
+  datos_mysql:
+  adjuntos:

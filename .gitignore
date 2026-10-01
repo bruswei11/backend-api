@@ -1,0 +1,7 @@
+# Compilados
+target/
+
+# Claves y configuración local: nunca a GitHub
+.env
+*.env
+!.env.ejemplo

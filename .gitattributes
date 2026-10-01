@@ -1,0 +1,5 @@
+# Archivos de texto con fin de línea normalizado; los .bat con el de Windows.
+* text=auto
+*.bat text eol=crlf
+# La versión web compilada se guarda tal cual (byte por byte).
+src/main/resources/static/** -text
