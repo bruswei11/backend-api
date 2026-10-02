@@ -6,18 +6,14 @@ import com.sistemapsicologia.api.repository.AuditoriaRepository;
 import com.sistemapsicologia.api.repository.UsuarioRepository;
 import com.sistemapsicologia.api.security.JwtService;
 import com.sistemapsicologia.api.security.PasswordUtil;
-import jakarta.servlet.http.HttpServletRequest;
+import com.sistemapsicologia.api.security.PermisoCrearUsuarios;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,8 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
  * exactamente la misma respuesta que una cuenta real con contraseña incorrecta, para no revelar qué
  * nombres de usuario existen.
  *
- * Todos los usuarios son profesionales de psicología: no hay administrador que cree cuentas, cada
- * profesional se registra solo desde el login (y solo ve a sus propios estudiantes).
+ * Todos los usuarios son profesionales de psicología (cada uno ve solo a sus estudiantes). No hay
+ * registro libre: las cuentas nuevas las crea josechavez desde Configuración → Usuarios.
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -40,13 +36,6 @@ public class AuthController {
     private static final int MAX_INTENTOS_FALLIDOS = 5;
     private static final int MINUTOS_PRIMER_BLOQUEO = 5;
     private static final int MINUTOS_BLOQUEO_REPETIDO = 10;
-    private static final int MIN_LARGO_PASSWORD = 8;
-    private static final Pattern USUARIO_VALIDO = Pattern.compile("[A-Za-z0-9._-]{3,30}");
-
-    /** Cuentas nuevas por hora, por dirección y en total, para que nadie llene la base de cuentas falsas. */
-    private static final int REGISTROS_POR_HORA_POR_IP = 5;
-    private static final int REGISTROS_POR_HORA_TOTAL = 30;
-    private static final Map<String, Deque<Long>> REGISTROS_RECIENTES = new HashMap<>();
 
     /** Intentos contra usuarios que NO existen (no hay fila donde guardarlos): {intentos, bloqueado hasta ms, ya bloqueado}. */
     private static final Map<String, long[]> INTENTOS_USUARIOS_INEXISTENTES = new HashMap<>();
@@ -54,11 +43,14 @@ public class AuthController {
     private final UsuarioRepository usuarioRepository;
     private final AuditoriaRepository auditoriaRepository;
     private final JwtService jwtService;
+    private final PermisoCrearUsuarios permisoCrearUsuarios;
 
-    public AuthController(UsuarioRepository usuarioRepository, AuditoriaRepository auditoriaRepository, JwtService jwtService) {
+    public AuthController(UsuarioRepository usuarioRepository, AuditoriaRepository auditoriaRepository, JwtService jwtService,
+            PermisoCrearUsuarios permisoCrearUsuarios) {
         this.usuarioRepository = usuarioRepository;
         this.auditoriaRepository = auditoriaRepository;
         this.jwtService = jwtService;
+        this.permisoCrearUsuarios = permisoCrearUsuarios;
     }
 
     @PostMapping("/login")
@@ -85,7 +77,8 @@ public class AuthController {
             usuarioRepository.registrarIntentos(u.id(), 0, null);
             auditoriaRepository.registrar(u.id(), u.nombre(), "LOGIN", "usuarios", u.id(), "Desde la app móvil");
             String token = jwtService.generarToken(u.id(), u.usuario(), u.nombre(), "psicologo");
-            return ResponseEntity.ok(new LoginResponse(token, u.id(), u.usuario(), u.nombre(), "psicologo"));
+            return ResponseEntity.ok(new LoginResponse(token, u.id(), u.usuario(), u.nombre(), "psicologo",
+                permisoCrearUsuarios.permite(u.usuario())));
         }
 
         int nuevos = u.intentosFallidos() + 1;
@@ -119,72 +112,6 @@ public class AuthController {
                 return bloqueada(minutos);
             }
             return incorrecta(MAX_INTENTOS_FALLIDOS - (int) estado[0]);
-        }
-    }
-
-    /** "Crear cuenta" del login: siempre como profesional de psicología, y deja la sesión iniciada. */
-    @PostMapping("/registro")
-    public ResponseEntity<?> registro(@RequestBody Map<String, String> body, HttpServletRequest request) {
-        String usuario = body.get("usuario") != null ? body.get("usuario").trim() : "";
-        String nombre = body.get("nombre") != null ? body.get("nombre").trim() : "";
-        String password = body.get("password") != null ? body.get("password") : "";
-        if (nombre.isEmpty() || nombre.length() > 100) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Escribí tu nombre y apellido"));
-        }
-        if (!USUARIO_VALIDO.matcher(usuario).matches()) {
-            return ResponseEntity.badRequest().body(Map.of("error",
-                "El usuario debe tener entre 3 y 30 caracteres: letras, números, punto, guion o guion bajo (sin espacios)"));
-        }
-        if (password.length() < MIN_LARGO_PASSWORD) {
-            return ResponseEntity.badRequest().body(Map.of("error",
-                "La contraseña debe tener al menos " + MIN_LARGO_PASSWORD + " caracteres"));
-        }
-        if (usuarioRepository.existeUsuario(usuario)) {
-            return ResponseEntity.status(409).body(Map.of("error", "Ese nombre de usuario ya está en uso. Elegí otro."));
-        }
-        if (!permitirRegistro(direccion(request))) {
-            return ResponseEntity.status(429).body(Map.of("error",
-                "Se crearon demasiadas cuentas en poco tiempo. Probá de nuevo en una hora."));
-        }
-        int id;
-        try {
-            id = usuarioRepository.crear(usuario, nombre, password, "psicologo");
-        } catch (DataIntegrityViolationException e) {
-            return ResponseEntity.status(409).body(Map.of("error", "Ese nombre de usuario ya está en uso. Elegí otro."));
-        }
-        auditoriaRepository.registrar(id, nombre, "REGISTRO_USUARIO", "usuarios", id, "Cuenta creada desde el login");
-        String token = jwtService.generarToken(id, usuario, nombre, "psicologo");
-        return ResponseEntity.status(201).body(new LoginResponse(token, id, usuario, nombre, "psicologo"));
-    }
-
-    /** IP del cliente: detrás del proxy de Render llega en X-Forwarded-For (la última es la que vio el proxy). */
-    private static String direccion(HttpServletRequest request) {
-        String reenviada = request.getHeader("X-Forwarded-For");
-        if (reenviada != null && !reenviada.isBlank()) {
-            String[] partes = reenviada.split(",");
-            return partes[partes.length - 1].trim();
-        }
-        return request.getRemoteAddr();
-    }
-
-    private static boolean permitirRegistro(String ip) {
-        long ahora = System.currentTimeMillis();
-        long haceUnaHora = ahora - 3_600_000L;
-        synchronized (REGISTROS_RECIENTES) {
-            for (Deque<Long> fechas : REGISTROS_RECIENTES.values()) {
-                while (!fechas.isEmpty() && fechas.peekFirst() < haceUnaHora) {
-                    fechas.pollFirst();
-                }
-            }
-            REGISTROS_RECIENTES.values().removeIf(Deque::isEmpty);
-            Deque<Long> total = REGISTROS_RECIENTES.computeIfAbsent("*", k -> new ArrayDeque<>());
-            Deque<Long> deEstaIp = REGISTROS_RECIENTES.computeIfAbsent(ip, k -> new ArrayDeque<>());
-            if (total.size() >= REGISTROS_POR_HORA_TOTAL || deEstaIp.size() >= REGISTROS_POR_HORA_POR_IP) {
-                return false;
-            }
-            total.addLast(ahora);
-            deEstaIp.addLast(ahora);
-            return true;
         }
     }
 

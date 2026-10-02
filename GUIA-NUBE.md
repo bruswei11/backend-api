@@ -107,7 +107,7 @@ gratuitos se pausan tras una semana sin uso).
 1. En Supabase, creá un **proyecto nuevo** (base vacía).
 2. En Render cambiá `DB_URL`/`DB_USUARIO`/`DB_PASSWORD` a los del proyecto nuevo y
    `APP_DATOS_DEMO` a `false`.
-3. Cada profesional crea su cuenta desde el login ("¿No tenés cuenta? Creá una"). Pedime ayuda para pasar los estudiantes de la PC.
+3. Las cuentas nuevas las crea **josechavez** desde Configuración → Usuarios. Pedime ayuda para pasar los estudiantes de la PC.
 4. Descargá un respaldo seguido: Estudiantes → *Reportes y archivos* → **Respaldar mis datos**.
 
 ## Límites del plan gratuito

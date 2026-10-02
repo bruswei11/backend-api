@@ -11,8 +11,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 /**
  * API sin sesión (stateless): cada request se autentica por su cuenta vía el JWT en el header
- * Authorization, no hay cookie de sesión ni CSRF que proteger. /api/health, /api/auth/login y
- * /api/auth/registro son las únicas rutas públicas -- todo lo demás exige un token válido.
+ * Authorization, no hay cookie de sesión ni CSRF que proteger. /api/health y /api/auth/login son
+ * las únicas rutas públicas -- todo lo demás exige un token válido.
  */
 @Configuration
 public class SecurityConfig {
@@ -29,7 +29,7 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/health", "/api/auth/login", "/api/auth/registro").permitAll()
+                .requestMatchers("/api/health", "/api/auth/login").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 // Todo lo que no es /api es la versión web de la app (archivos estáticos): pública,
                 // igual que la pantalla de login; los datos siguen exigiendo token.
