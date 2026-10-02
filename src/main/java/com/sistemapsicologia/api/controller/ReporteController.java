@@ -48,26 +48,32 @@ public class ReporteController {
         this.jdbc = jdbc;
     }
 
-    /** Tablas del respaldo, en orden de dependencias (así se pueden volver a cargar en ese orden). */
-    private static final String[] TABLAS_RESPALDO = {
-        "usuarios", "pacientes", "turnos", "sesiones", "historia_psicologica", "documentos_paciente", "auditoria"};
+    /**
+     * Tablas del respaldo (en orden de dependencias), cada una filtrada a los datos del profesional
+     * que lo pide: sus estudiantes y lo que cuelga de ellos, y su propio registro de actividad.
+     */
+    private static final String[][] TABLAS_RESPALDO = {
+        {"pacientes", "SELECT * FROM pacientes WHERE psicologo_id = ? ORDER BY id"},
+        {"turnos", "SELECT * FROM turnos WHERE paciente_id IN (SELECT id FROM pacientes WHERE psicologo_id = ?) ORDER BY id"},
+        {"sesiones", "SELECT * FROM sesiones WHERE paciente_id IN (SELECT id FROM pacientes WHERE psicologo_id = ?) ORDER BY id"},
+        {"historia_psicologica", "SELECT * FROM historia_psicologica WHERE paciente_id IN (SELECT id FROM pacientes WHERE psicologo_id = ?) ORDER BY id"},
+        {"documentos_paciente", "SELECT * FROM documentos_paciente WHERE paciente_id IN (SELECT id FROM pacientes WHERE psicologo_id = ?) ORDER BY id"},
+        {"auditoria", "SELECT * FROM auditoria WHERE usuario_id = ? ORDER BY id"}};
 
     /**
-     * "Respaldar ahora" (solo admin): un .zip con una planilla CSV por tabla, para guardar una copia
-     * propia de los datos cuando el sistema vive en la nube. El contenido de los adjuntos no se
-     * incluye (solo sus datos), para que el archivo no sea enorme.
+     * "Respaldar mis datos": un .zip con una planilla CSV por tabla, para guardar una copia propia
+     * cuando el sistema vive en la nube. El contenido de los adjuntos no se incluye (solo sus
+     * datos), para que el archivo no sea enorme.
      */
     @GetMapping("/respaldo")
     public ResponseEntity<?> respaldo(Authentication auth) throws java.io.IOException {
         UsuarioAutenticado u = usuario(auth);
-        if (!u.esAdmin()) {
-            return ResponseEntity.status(403).body(Map.of("error", "Solo un administrador puede descargar un respaldo"));
-        }
         java.io.ByteArrayOutputStream salida = new java.io.ByteArrayOutputStream();
         try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(salida, StandardCharsets.UTF_8)) {
-            for (String tabla : TABLAS_RESPALDO) {
+            for (String[] consulta : TABLAS_RESPALDO) {
+                String tabla = consulta[0];
                 StringBuilder csv = new StringBuilder(Reportes.BOM);
-                jdbc.query("SELECT * FROM " + tabla + " ORDER BY id", (java.sql.ResultSet rs) -> {
+                jdbc.query(consulta[1], (java.sql.ResultSet rs) -> {
                     java.sql.ResultSetMetaData md = rs.getMetaData();
                     int n = md.getColumnCount();
                     for (int i = 1; i <= n; i++) {
@@ -86,7 +92,7 @@ public class ReporteController {
                         csv.append("\r\n");
                     }
                     return null;
-                });
+                }, u.getUsuarioId());
                 zip.putNextEntry(new java.util.zip.ZipEntry(tabla + ".csv"));
                 zip.write(csv.toString().getBytes(StandardCharsets.UTF_8));
                 zip.closeEntry();

@@ -23,7 +23,9 @@ public class UsuarioAutenticado {
     public String getNombre() { return nombre; }
     public String getRol() { return rol; }
 
-    public boolean esAdmin() { return "admin".equals(rol); }
-    public boolean esPsicologo() { return "psicologo".equals(rol); }
-    public boolean esSecretaria() { return "secretaria".equals(rol); }
+    // Solo hay profesionales de psicología: cualquier cuenta (aunque la base aún diga otro rol) se
+    // trata como profesional, así cada uno ve únicamente a sus propios estudiantes.
+    public boolean esAdmin() { return false; }
+    public boolean esPsicologo() { return true; }
+    public boolean esSecretaria() { return false; }
 }

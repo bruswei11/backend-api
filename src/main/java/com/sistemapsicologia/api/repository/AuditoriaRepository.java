@@ -39,9 +39,10 @@ public class AuditoriaRepository {
     }
 
     /** Mismo filtro de texto/fecha que la pestaña "Actividad reciente" de Configuracion.java del escritorio. */
-    public List<AuditoriaDTO> buscar(String texto, LocalDateTime desde, LocalDateTime hasta, int limite) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM auditoria WHERE 1=1 ");
+    public List<AuditoriaDTO> buscar(int usuarioId, String texto, LocalDateTime desde, LocalDateTime hasta, int limite) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM auditoria WHERE usuario_id = ? ");
         List<Object> params = new ArrayList<>();
+        params.add(usuarioId);
         if (texto != null && !texto.isBlank()) {
             sql.append("AND (LOWER(usuario_nombre) LIKE ? OR LOWER(accion) LIKE ? OR LOWER(entidad) LIKE ? "
                 + "OR LOWER(detalle) LIKE ?) ");

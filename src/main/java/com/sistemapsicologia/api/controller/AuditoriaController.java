@@ -5,7 +5,6 @@ import com.sistemapsicologia.api.repository.AuditoriaRepository;
 import com.sistemapsicologia.api.security.UsuarioAutenticado;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -14,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Solo admin -- misma pestaña "Actividad reciente" de Configuracion.java del escritorio. */
+/** "Mi actividad": cada profesional ve solo su propio registro de accesos y cambios. */
 @RestController
 @RequestMapping("/api/auditoria")
 public class AuditoriaController {
@@ -33,10 +32,7 @@ public class AuditoriaController {
             @RequestParam(defaultValue = "200") int limite,
             Authentication auth) {
         UsuarioAutenticado u = (UsuarioAutenticado) auth.getPrincipal();
-        if (!u.esAdmin()) {
-            return ResponseEntity.status(403).body(Map.of("error", "Solo un administrador puede ver la actividad reciente"));
-        }
-        List<AuditoriaDTO> registros = auditoriaRepository.buscar(texto, desde, hasta, limite);
+        List<AuditoriaDTO> registros = auditoriaRepository.buscar(u.getUsuarioId(), texto, desde, hasta, limite);
         return ResponseEntity.ok(registros);
     }
 }

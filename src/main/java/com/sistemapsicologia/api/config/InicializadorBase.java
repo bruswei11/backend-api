@@ -79,6 +79,12 @@ public class InicializadorBase implements InitializingBean {
         if (crearTablas && !existeTabla("usuarios")) {
             crearEsquema();
         }
+        // En el sistema web solo hay profesionales de psicología: las cuentas que eran de
+        // administración o secretaría pasan a profesional (cada una ve solo sus estudiantes).
+        int convertidas = jdbc.update("UPDATE usuarios SET rol = 'psicologo' WHERE rol <> 'psicologo'");
+        if (convertidas > 0) {
+            LOG.info("{} cuenta(s) pasaron a profesional de psicología.", convertidas);
+        }
         if (datosDemo) {
             Integer total = jdbc.queryForObject("SELECT COUNT(*) FROM usuarios", Integer.class);
             if (total != null && total == 0) {
@@ -135,10 +141,8 @@ public class InicializadorBase implements InitializingBean {
 
     private void cargarDemo() {
         LOG.warn("Cargando DATOS DE DEMOSTRACIÓN (inventados). No usar esta base con estudiantes reales.");
-        usuarios.crear("demo_admin", "Administración (demo)", passwordDemo, "admin");
         int psico = usuarios.crear("demo_psicologa", "Lic. Ana Demo", passwordDemo, "psicologo");
         int psico2 = usuarios.crear("demo_psicologo2", "Lic. Pedro Demo", passwordDemo, "psicologo");
-        usuarios.crear("demo_secretaria", "Secretaría (demo)", passwordDemo, "secretaria");
 
         String[][] estudiantes = {
             {"Lucía", "Ejemplo", "Femenino", "7° EEB - Sección A - Turno Mañana"},
@@ -186,6 +190,6 @@ public class InicializadorBase implements InitializingBean {
         s.setDuracionMinutos(30);
         s.setDuracionSegundos(0);
         sesiones.crear(s);
-        LOG.warn("Datos demo cargados. Usuarios: demo_admin, demo_psicologa, demo_psicologo2, demo_secretaria.");
+        LOG.warn("Datos demo cargados. Usuarios: demo_psicologa, demo_psicologo2.");
     }
 }
